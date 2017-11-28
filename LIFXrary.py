@@ -24,14 +24,15 @@ def buildBulb(data):
 
 
 class Method(object):
-    def __init__(self,ptr):
+    def __init__(self,route,ptr):
+        self.route = route
         self.ptr = ptr
 
     def __call__(self,*args,**kwargs):
-        self.ptr(kwargs)
+        self.ptr(self.route,*args,**kwargs)
 
 class MethodSpecific(object):
-    def __init__(self,ptr,keyword):
+    def __init__(self,route,ptr,keyword):
         self.ptr = ptr
         self.keyword = keyword
 
@@ -39,7 +40,7 @@ class MethodSpecific(object):
         self.ptr({self.keyword:args[0]})
 
 class MethodPrewritten(object):
-    def __init__(self,ptr,payload):
+    def __init__(self,route,ptr,payload):
         self.ptr = ptr
         self.payload = payload
 
@@ -51,17 +52,36 @@ class View(object):
         self.parent = parent
         self.query = query
 
-        self.cmd = {
+        self.cmdList = ['off',
+                        'on',
+                        'toggle',
+                        'setState',
+                        'setPower',
+                        'setBrightness',
+                        'setInfrared',
+                        'pulseEffect']
+
+        self.cmd = {'off':   Method('off',self.abstractRequest),
+                    'on':    Method('on',self.abstractRequest),
+                    'setState': Method('setState',self.abstractRequest)}
+        '''
+        self.cmd = {}
                     'off':           MethodPrewritten(self.handleSetState,{'power':'off'}),
                     'on':            MethodPrewritten(self.handleSetState,{'power':'on'}),
                     'toggle':        Method(self.handleToggle),
                     'setState':      Method(self.handleSetState),
+                    'testingThis':   Method(self.parent.abstractRequest('testing')),
                     'setPower':      MethodSpecific(self.handleSetState,'power'),
                     'setColor':      MethodSpecific(self.handleSetState,'color'),
                     'setBrightness': MethodSpecific(self.handleSetState,'brightness'),
                     'setInfrared':   MethodSpecific(self.handleSetState,'infrared'),
                     'pulseEffect':   Method(self.handlePulseEffect),
                     }
+        '''
+
+    def abstractRequest(self,*args,**kwargs):
+        kwargs['query'] = self.query
+        self.parent.abstractRequest(*args,**kwargs)
 
     def handleOff(self):
         self.parent.operation(self.query,'off')
@@ -79,8 +99,11 @@ class View(object):
         self.parent.operation(self.query,'pulseEffect',kwargs)
 
     def __getattr__(self,e):
-        if e in self.cmd.keys():
-            return self.cmd[e]
+        if e in self.cmdList:
+            return Method(e,self.abstractRequest)
+
+        #if e in self.cmd.keys():
+        #    return self.cmd[e]
 
     def __repr__(self):
         contents = ','.join(['label:'+bulb.label for bulb in self.parent.filteredLights(self.query)])
@@ -90,6 +113,9 @@ class State(object):
     def __init__(self,token):
         self.headers = {'Authorization': 'Bearer ' + token}
         self.backoff = [1,1,1,1,1,2,4,8,16,32]
+
+        self.requestParams = {'toggle':{'url':'https://api.lifx.com/v1/lights/{0}/toggle'},
+                              'setState':{'url':'https://api.lifx.com/v1/lights/{0}/state'}}
 
     def filter(self,query):
         return View(self,query)
@@ -120,22 +146,10 @@ class State(object):
         elif op == 'pulseEffect':
             self.pulseEffect(selector,kwargs)
 
-
-    def on(self,selector):
-        print(('on',selector))
-        '''
-        resp = requests.put('https://api.lifx.com/v1/lights/{0}/state'.format(selector),
-                             data={'power':'on'},
-                             headers=self.headers)
-        '''
-
-    def off(self,selector):
-        print(('off',selector))
-        '''
-        resp = requests.put('https://api.lifx.com/v1/lights/{0}/state'.format(selector),
-                             data={'power':'off'},
-                             headers=self.headers)
-        '''
+    def abstractRequest(self,*args,**kwargs):
+        print('received by abstractRequest')
+        print((args,kwargs))
+        print(' ')
 
     def toggle(self,selector):
         print(('toggle',selector))
@@ -160,25 +174,29 @@ class State(object):
                               headers=self.headers)
         '''
 
-token = ''
+
+with open('tokens.json') as f:
+    token = json.load(f)['lifx']
+
+
 
 s = State(token)
 
 bedroom = s.filter(lambda bulb : 'bedroom' in bulb.label)
 closet = s.filter(lambda bulb : 'closet' in bulb.label)
 
-
 colorCapable = s.filter(lambda bulb : bulb.product.capabilities.has_color)
 
+#closet.setState(brightness=0.5,color='green')
+
+closet.setBrightness(0.5)
 
 #closet.pulseEffect(color='red',from_color='blue')
 
 #scenes = s.getScenes()
 
-closet.on()
 
-
-
+#closet.off()
 
 
 
