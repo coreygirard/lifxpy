@@ -160,7 +160,7 @@ class State(object):
                               headers=self.headers)
         '''
 
-token = 'c917678ee3fdeee1f81332a7aa01560f93831c50d9d5ef4feb81107563d1de91'
+token = ''
 
 s = State(token)
 
