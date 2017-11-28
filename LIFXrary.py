@@ -57,27 +57,14 @@ class View(object):
                         'toggle',
                         'setState',
                         'setPower',
+                        'setColor',
                         'setBrightness',
                         'setInfrared',
-                        'pulseEffect']
-
-        self.cmd = {'off':   Method('off',self.abstractRequest),
-                    'on':    Method('on',self.abstractRequest),
-                    'setState': Method('setState',self.abstractRequest)}
-        '''
-        self.cmd = {}
-                    'off':           MethodPrewritten(self.handleSetState,{'power':'off'}),
-                    'on':            MethodPrewritten(self.handleSetState,{'power':'on'}),
-                    'toggle':        Method(self.handleToggle),
-                    'setState':      Method(self.handleSetState),
-                    'testingThis':   Method(self.parent.abstractRequest('testing')),
-                    'setPower':      MethodSpecific(self.handleSetState,'power'),
-                    'setColor':      MethodSpecific(self.handleSetState,'color'),
-                    'setBrightness': MethodSpecific(self.handleSetState,'brightness'),
-                    'setInfrared':   MethodSpecific(self.handleSetState,'infrared'),
-                    'pulseEffect':   Method(self.handlePulseEffect),
-                    }
-        '''
+                        'pulseEffect',
+                        'stateDelta',
+                        'breatheEffect',
+                        'pulseEffect',
+                        'cycle']
 
     def abstractRequest(self,*args,**kwargs):
         kwargs['query'] = self.query
@@ -114,8 +101,18 @@ class State(object):
         self.headers = {'Authorization': 'Bearer ' + token}
         self.backoff = [1,1,1,1,1,2,4,8,16,32]
 
-        self.requestParams = {'toggle':{'url':'https://api.lifx.com/v1/lights/{0}/toggle'},
-                              'setState':{'url':'https://api.lifx.com/v1/lights/{0}/state'}}
+        self.requestParams = {'toggle':        {'url':'https://api.lifx.com/v1/lights/{0}/toggle',
+                                                'method':'post'},
+                              'setState':      {'url':'https://api.lifx.com/v1/lights/{0}/state',
+                                                'method':'post'},
+                              'stateDelta':    {'url':'https://api.lifx.com/v1/lights/{0}/state/delta',
+                                                'method':'post'},
+                              'breatheEffect': {'url':'https://api.lifx.com/v1/lights/{0}/effects/breathe',
+                                                'method':'post'},
+                              'pulseEffect':   {'url':'https://api.lifx.com/v1/lights/{0}/effects/pulse',
+                                                'method':'post'},
+                              'cycle':         {'url':'https://api.lifx.com/v1/lights/{0}/cycle',
+                                                'method':'post'}}
 
     def filter(self,query):
         return View(self,query)
@@ -130,6 +127,10 @@ class State(object):
 
     def filteredLights(self,query):
         return [bulb for bulb in self.listLights() if query(bulb)]
+
+    def buildSelector(self,query):
+        idMatch = ['id:'+bulb.id for bulb in self.filteredLights(query)]
+        return ','.join(idMatch)
 
     def operation(self,query,op,kwargs={}):
         idMatch = ['id:'+bulb.id for bulb in self.filteredLights(query)]
@@ -147,32 +148,84 @@ class State(object):
             self.pulseEffect(selector,kwargs)
 
     def abstractRequest(self,*args,**kwargs):
-        print('received by abstractRequest')
-        print((args,kwargs))
-        print(' ')
+        print(args[0])
+        #print((args,kwargs))
 
-    def toggle(self,selector):
-        print(('toggle',selector))
-        '''
-        resp = requests.post('https://api.lifx.com/v1/lights/{0}/toggle'.format(selector),
-                              headers=self.headers)
-        '''
+        query = kwargs['query']
+        del kwargs['query']
+        data = kwargs
 
-    def setState(self,selector,kwargs):
-        print(('setState',selector,kwargs))
-        '''
-        resp = requests.put('https://api.lifx.com/v1/lights/{0}/state'.format(selector),
-                             data={'power':'off'},
-                             headers=self.headers)
-        '''
+        label = args[0]
+        if label == 'on':
+            cmd = 'setState'
+            data['power'] = 'on'
 
-    def pulseEffect(self,selector,data):
-        print(('pulseEffect',selector,data))
-        '''
-        resp = requests.post('https://api.lifx.com/v1/lights/{0}/effects/pulse'.format(selector),
-                              data=data,
-                              headers=self.headers)
-        '''
+        elif label == 'off':
+            cmd = 'setState'
+            data['power'] = 'off'
+
+        elif label == 'toggle':
+            cmd = 'toggle'
+
+        elif label == 'setPower':
+            cmd,data = 'setState',{'power':args[1]}
+
+        elif label == 'setColor':
+            if len(args) > 1 and type(args[1]) == type('string'):
+                cmd,data = 'setState',{'color':args[1]}
+            else: # if we get a bunch of keyword arguments, need to compile to string
+                cmd = 'setState'
+                s = []
+                if 'rgb' in kwargs.keys():
+                    s.append('rgb:' + ','.join([str(e) for e in kwargs['rgb']]))
+
+                s += [k+':'+str(v) for k,v in kwargs.items() if k != 'rgb']
+                data = {'color':' '.join(s)}
+
+
+        elif label == 'setBrightness':
+            cmd,data = 'setState',{'brightness':args[1]}
+
+        elif label == 'setInfrared':
+            cmd,data = 'setState',{'infrared':args[1]}
+
+        elif label == 'setState':
+            cmd = 'setState'
+
+        elif label == 'stateDelta':
+            cmd = 'stateDelta'
+
+        elif label == 'breatheEffect':
+            cmd = 'breatheEffect'
+
+        elif label == 'pulseEffect':
+            cmd = 'pulseEffect'
+
+        elif label == 'cycle':
+            cmd = 'cycle'
+
+        else:
+            cmd = ''
+
+
+        #print('received by abstractRequest')
+        #print((cmd,data))
+        #print(' ')
+
+        self.handleBackoff(cmd,query,data)
+
+    def handleBackoff(self,cmd,query,data):
+        self.actuallyRequest(cmd,query,data)
+
+    def actuallyRequest(self,cmd,query,data):
+        params = self.requestParams[cmd]
+
+        method = params['method']
+        url = params['url'].format(self.buildSelector(query))
+
+        print(method,url,data)
+
+
 
 
 with open('tokens.json') as f:
@@ -189,9 +242,21 @@ colorCapable = s.filter(lambda bulb : bulb.product.capabilities.has_color)
 
 #closet.setState(brightness=0.5,color='green')
 
+closet.on()
+closet.on(duration=5.0)
+closet.off()
+closet.toggle()
+closet.toggle(duration=2.0)
+closet.setPower('on')
+closet.setColor('green')
+closet.setColor(brightness=0.5,rgb=[0,100,100])
 closet.setBrightness(0.5)
-
-#closet.pulseEffect(color='red',from_color='blue')
+closet.setInfrared(0.2)
+closet.setState(color='blue',brightness=0.5)
+closet.stateDelta(hue=-15,saturation=0.1)
+closet.breatheEffect(color='red',from_color='blue')
+closet.pulseEffect(color='red',from_color='blue',period=0.5)
+closet.cycle(states={'states':[{'color':'red'},{'color':'blue'}],'defaults':{'power':'on'}})
 
 #scenes = s.getScenes()
 
