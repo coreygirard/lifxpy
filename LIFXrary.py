@@ -27,17 +27,41 @@ class Method(object):
     def __init__(self,ptr):
         self.ptr = ptr
 
+    def __call__(self,*args,**kwargs):
+        self.ptr(kwargs)
+
+class MethodSpecific(object):
+    def __init__(self,ptr,keyword):
+        self.ptr = ptr
+        self.keyword = keyword
+
+    def __call__(self,*args):
+        self.ptr({self.keyword:args[0]})
+
+class MethodPrewritten(object):
+    def __init__(self,ptr,payload):
+        self.ptr = ptr
+        self.payload = payload
+
     def __call__(self):
-        self.ptr()
+        self.ptr(self.payload)
 
 class View(object):
     def __init__(self,parent,query):
         self.parent = parent
         self.query = query
 
-        self.cmd = {'off':    Method(self.handleOff),
-                    'on':     Method(self.handleOn),
-                    'toggle': Method(self.handleToggle)}
+        self.cmd = {
+                    'off':           MethodPrewritten(self.handleSetState,{'power':'off'}),
+                    'on':            MethodPrewritten(self.handleSetState,{'power':'on'}),
+                    'toggle':        Method(self.handleToggle),
+                    'setState':      Method(self.handleSetState),
+                    'setPower':      MethodSpecific(self.handleSetState,'power'),
+                    'setColor':      MethodSpecific(self.handleSetState,'color'),
+                    'setBrightness': MethodSpecific(self.handleSetState,'brightness'),
+                    'setInfrared':   MethodSpecific(self.handleSetState,'infrared'),
+                    'pulseEffect':   Method(self.handlePulseEffect),
+                    }
 
     def handleOff(self):
         self.parent.operation(self.query,'off')
@@ -47,6 +71,12 @@ class View(object):
 
     def handleToggle(self):
         self.parent.operation(self.query,'toggle')
+
+    def handleSetState(self,kwargs):
+        self.parent.operation(self.query,'setState',kwargs)
+
+    def handlePulseEffect(self,kwargs):
+        self.parent.operation(self.query,'pulseEffect',kwargs)
 
     def __getattr__(self,e):
         if e in self.cmd.keys():
@@ -59,9 +89,14 @@ class View(object):
 class State(object):
     def __init__(self,token):
         self.headers = {'Authorization': 'Bearer ' + token}
+        self.backoff = [1,1,1,1,1,2,4,8,16,32]
 
     def filter(self,query):
         return View(self,query)
+
+    def setBackoff(self,backoff):
+        assert(type(backoff) == type([]))
+        self.backoff = backoff
 
     def listLights(self):
         resp = requests.get('https://api.lifx.com/v1/lights/all',headers=self.headers)
@@ -70,7 +105,7 @@ class State(object):
     def filteredLights(self,query):
         return [bulb for bulb in self.listLights() if query(bulb)]
 
-    def operation(self,query,op):
+    def operation(self,query,op,kwargs={}):
         idMatch = ['id:'+bulb.id for bulb in self.filteredLights(query)]
         selector = ','.join(idMatch)
 
@@ -80,22 +115,52 @@ class State(object):
             self.off(selector)
         elif op == 'toggle':
             self.toggle(selector)
+        elif op == 'setState':
+            self.setState(selector,kwargs)
+        elif op == 'pulseEffect':
+            self.pulseEffect(selector,kwargs)
+
 
     def on(self,selector):
+        print(('on',selector))
+        '''
         resp = requests.put('https://api.lifx.com/v1/lights/{0}/state'.format(selector),
                              data={'power':'on'},
                              headers=self.headers)
+        '''
 
     def off(self,selector):
+        print(('off',selector))
+        '''
         resp = requests.put('https://api.lifx.com/v1/lights/{0}/state'.format(selector),
                              data={'power':'off'},
                              headers=self.headers)
+        '''
 
     def toggle(self,selector):
+        print(('toggle',selector))
+        '''
         resp = requests.post('https://api.lifx.com/v1/lights/{0}/toggle'.format(selector),
-                             headers=self.headers)
+                              headers=self.headers)
+        '''
 
-token = ''
+    def setState(self,selector,kwargs):
+        print(('setState',selector,kwargs))
+        '''
+        resp = requests.put('https://api.lifx.com/v1/lights/{0}/state'.format(selector),
+                             data={'power':'off'},
+                             headers=self.headers)
+        '''
+
+    def pulseEffect(self,selector,data):
+        print(('pulseEffect',selector,data))
+        '''
+        resp = requests.post('https://api.lifx.com/v1/lights/{0}/effects/pulse'.format(selector),
+                              data=data,
+                              headers=self.headers)
+        '''
+
+token = 'c917678ee3fdeee1f81332a7aa01560f93831c50d9d5ef4feb81107563d1de91'
 
 s = State(token)
 
@@ -103,144 +168,22 @@ bedroom = s.filter(lambda bulb : 'bedroom' in bulb.label)
 closet = s.filter(lambda bulb : 'closet' in bulb.label)
 
 
-warm = s.filter(lambda bulb : bulb.color.kelvin == 3500)
-
-#closet.toggle()
-
-#recent = s.filter(lambda bulb : bulb['seconds_since_seen'] < 20)
+colorCapable = s.filter(lambda bulb : bulb.product.capabilities.has_color)
 
 
-print(closet)
-print(warm)
+#closet.pulseEffect(color='red',from_color='blue')
+
+#scenes = s.getScenes()
+
+closet.on()
 
 
-'''
-class State(object):
-    def __init__(self,token):
-        self.headers = {'Authorization': 'Bearer ' + token}
-
-    def filter(self,query):
-        return View(query)
 
 
-token = ''
-
-s = State(token)
 
 
-q = s.filter('hello')
-
-q.off()
-'''
 
 
-'''
-token = ''
-
-s = State(token)
-
-resp = requests.get('https://api.lifx.com/v1/lights/all',headers=s.headers)
-
-from pprint import pprint
-pprint(resp.json())
-
-
-class Light(object):
-    def __init__(self,data,headers):
-        self.data = data
-        self.headers = headers
-
-        self.brightness = data['brightness']
-        self.hue = data['color']['hue']
-        self.kelvin = data['color']['kelvin']
-        self.saturation = data['color']['saturation']
-        self.id = data['id']
-        self.label = data['label']
-        self.power = data['power']
-
-
-class State(object):
-    def __init__(self,token):
-        self.headers = {"Authorization": "Bearer %s" % token}
-
-        self.light = {}
-        for e in self.listAll():
-            temp = Light(e,self.headers)
-            self.light[temp.label] = temp
-
-    def makeRequest(self,method,url,selector,data={}):
-        if method == 'get':
-            response = requests.get(url.format(selector=selector), headers=self.headers)
-        elif method == 'put':
-            response = requests.put(url.format(selector=selector), data=data, headers=self.headers,verify=False)
-        elif method == 'post':
-            response = requests.post(url.format(selector=selector), data=data, headers=self.headers,verify=False)
-
-        return json.loads(response.text)
-
-    def listAll(self):
-        url = 'https://api.lifx.com/v1/lights/{selector}'
-        results = self.makeRequest('get',url=url,selector='all')
-        return results
-
-    def setState(self,selector,data):
-        results = self.makeRequest('put','https://api.lifx.com/v1/lights/{selector}/state',selector=selector,data=data)
-        return results
-
-
-    def tryIt(self,typ,url1,selector,url2,payload,waits=[1]): #[1,1,1,1,1,5,5,5,5,5,5]
-        results = {}
-        while (len(selector) > 0) and (len(waits) > 0):
-            s = ','.join(['label:'+e for e in selector])
-
-            #Make the HTTP call
-            if typ == 'put':
-                response = requests.put(url1 + s + url2,data=payload,headers=self.headers)
-            elif typ == 'post':
-                response = requests.post(url1 + s + url2,data=payload,headers=self.headers)
-
-            #Get results of attempt
-            r = json.loads(response.text)['results']
-
-            #Remove successful operations for next attempt
-            for d in r:
-                if d['status'] == 'ok':
-                    results[d['label']] = d['status']
-                    selector = [e for e in selector if e != d['label']]
-
-            #If some attempts failed
-            if len(selector) > 0:
-                time.sleep(waits.pop())
-
-        #Throw the failed results into the report
-        for d in r:
-            results[d['label']] = d['status']
-
-        if all([e=='ok' for e in results.values()]):
-            return results,'SUCCESS'
-        else:
-            return results,'FAILURE'
-
-
-    def on(self,selector,duration=1.0):
-        payload = {'power':'on','duration':duration}
-        results,outcome = self.tryIt('put','https://api.lifx.com/v1/lights/',selector,'/state',payload)
-        return results,outcome
-
-    def off(self,selector,duration=1.0):
-        payload = {'power':'off','duration':duration}
-        results,outcome = self.tryIt('put','https://api.lifx.com/v1/lights/',selector,'/state',payload)
-        return results,outcome
-
-    def toggle(self,selector,duration=1.0):
-        payload = {'duration':duration}
-        results,outcome = self.tryIt('post','https://api.lifx.com/v1/lights/',selector,'/toggle',payload)
-        return results,outcome
-
-
-def connect(token):
-    return State(token)
-'''
 
 
 
