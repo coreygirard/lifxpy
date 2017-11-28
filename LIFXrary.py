@@ -2,6 +2,7 @@ from pprint import pprint
 import time
 import json
 import requests
+import asyncio
 
 
 
@@ -22,6 +23,14 @@ def buildBulb(data):
     setBulbData(bulb,data)
     return bulb
 
+def bulb2dict(bulb):
+    d = {}
+    for k,v in vars(bulb).items():
+        if type(v) == type(Bulb()):
+            d[k] = bulb2dict(v)
+        else:
+            d[k] = v
+    return d
 
 class Method(object):
     def __init__(self,route,ptr):
@@ -31,6 +40,7 @@ class Method(object):
     def __call__(self,*args,**kwargs):
         self.ptr(self.route,*args,**kwargs)
 
+'''
 class MethodSpecific(object):
     def __init__(self,route,ptr,keyword):
         self.ptr = ptr
@@ -46,7 +56,7 @@ class MethodPrewritten(object):
 
     def __call__(self):
         self.ptr(self.payload)
-
+'''
 class View(object):
     def __init__(self,parent,query):
         self.parent = parent
@@ -89,22 +99,28 @@ class View(object):
         if e in self.cmdList:
             return Method(e,self.abstractRequest)
 
-        #if e in self.cmd.keys():
-        #    return self.cmd[e]
-
     def __repr__(self):
         contents = ','.join(['label:'+bulb.label for bulb in self.parent.filteredLights(self.query)])
         return 'View({0})'.format(contents)
 
 class State(object):
-    def __init__(self,token):
+    def __init__(self,token,alwaysRefresh=True):
         self.headers = {'Authorization': 'Bearer ' + token}
         self.backoff = [1,1,1,1,1,2,4,8,16,32]
+
+        '''
+        TODO: implement a low-latency mode where the module attempts to
+        keep track of all lights' state for filtering purposes, to reduce the
+        number of calls required to get lights' current state. Likely error-prone
+        in non-ideal network conditions or with complex operations, but
+        should assist in performing tightly choreographed sequences
+        '''
+        self.alwaysRefresh = alwaysRefresh
 
         self.requestParams = {'toggle':        {'url':'https://api.lifx.com/v1/lights/{0}/toggle',
                                                 'method':'post'},
                               'setState':      {'url':'https://api.lifx.com/v1/lights/{0}/state',
-                                                'method':'post'},
+                                                'method':'put'},
                               'stateDelta':    {'url':'https://api.lifx.com/v1/lights/{0}/state/delta',
                                                 'method':'post'},
                               'breatheEffect': {'url':'https://api.lifx.com/v1/lights/{0}/effects/breathe',
@@ -114,6 +130,15 @@ class State(object):
                               'cycle':         {'url':'https://api.lifx.com/v1/lights/{0}/cycle',
                                                 'method':'post'}}
 
+        self.loop = []
+
+        self.hardRefresh()
+
+    def hardRefresh(self):
+        print('hard refresh')
+        resp = requests.get('https://api.lifx.com/v1/lights/all',headers=self.headers)
+        self.lights = {e['id']:buildBulb(e) for e in resp.json()}
+
     def filter(self,query):
         return View(self,query)
 
@@ -122,35 +147,17 @@ class State(object):
         self.backoff = backoff
 
     def listLights(self):
-        resp = requests.get('https://api.lifx.com/v1/lights/all',headers=self.headers)
-        return [buildBulb(e) for e in resp.json()]
+        if self.alwaysRefresh:
+            self.hardRefresh()
+        return list(self.lights.values())
+
+    def debugState(self):
+        return [bulb2dict(e) for e in self.lights.values()]
 
     def filteredLights(self,query):
-        return [bulb for bulb in self.listLights() if query(bulb)]
-
-    def buildSelector(self,query):
-        idMatch = ['id:'+bulb.id for bulb in self.filteredLights(query)]
-        return ','.join(idMatch)
-
-    def operation(self,query,op,kwargs={}):
-        idMatch = ['id:'+bulb.id for bulb in self.filteredLights(query)]
-        selector = ','.join(idMatch)
-
-        if op == 'on':
-            self.on(selector)
-        elif op == 'off':
-            self.off(selector)
-        elif op == 'toggle':
-            self.toggle(selector)
-        elif op == 'setState':
-            self.setState(selector,kwargs)
-        elif op == 'pulseEffect':
-            self.pulseEffect(selector,kwargs)
+        return [bulb.id for bulb in self.listLights() if query(bulb)]
 
     def abstractRequest(self,*args,**kwargs):
-        print(args[0])
-        #print((args,kwargs))
-
         query = kwargs['query']
         del kwargs['query']
         data = kwargs
@@ -208,23 +215,56 @@ class State(object):
             cmd = ''
 
 
-        #print('received by abstractRequest')
-        #print((cmd,data))
-        #print(' ')
+        bulbs = self.filteredLights(query)
+        self.handleBackoff(cmd,bulbs,data)
 
-        self.handleBackoff(cmd,query,data)
+    # TODO: make concurrent
+    def coroutine(self,backoff,cmd,bulbs,data):
+        while len(backoff) > 0 and len(bulbs) > 0:
+            time.sleep(backoff.pop(0))
 
-    def handleBackoff(self,cmd,query,data):
-        self.actuallyRequest(cmd,query,data)
+            bulbs,resp = self.actuallyRequest(cmd,bulbs,data)
 
-    def actuallyRequest(self,cmd,query,data):
-        params = self.requestParams[cmd]
+    def handleBackoff(self,cmd,bulbs,data):
+        bulbs,resp = self.actuallyRequest(cmd,bulbs,data) # try once
 
-        method = params['method']
-        url = params['url'].format(self.buildSelector(query))
+        if len(bulbs) > 0:
+            self.coroutine(self.backoff[:],cmd,bulbs,data)
+
+    def updateState(self,bulb,cmd,data):
+        if cmd == 'setState':
+            for k,v in data.items():
+                setattr(self.lights[bulb],k,v)
+        elif cmd == 'toggle':
+            if self.lights[bulb].power == 'on':
+                self.lights[bulb].power = 'off'
+            else:
+                self.lights[bulb].power = 'on'
+
+    def actuallyRequest(self,cmd,bulbs,data):
+        method = self.requestParams[cmd]['method']
+        url = self.requestParams[cmd]['url']
+
+        selector = ','.join(['id:'+i for i in bulbs])
+        url = url.format(selector)
 
         print(method,url,data)
 
+        if method == 'get':
+            resp = requests.get(url,headers=self.headers)
+        elif method == 'put':
+            resp = requests.put(url,headers=self.headers,data=data)
+        elif method == 'post':
+            resp = requests.post(url,headers=self.headers,data=data)
+
+        failed = []
+        for result in resp.json()['results']:
+            if result['status'] == 'ok':
+                self.updateState(result['id'],cmd,data)
+            else:
+                failed.append(result['id'])
+
+        return failed,resp.json()
 
 
 
@@ -233,41 +273,16 @@ with open('tokens.json') as f:
 
 
 
-s = State(token)
-
-bedroom = s.filter(lambda bulb : 'bedroom' in bulb.label)
-closet = s.filter(lambda bulb : 'closet' in bulb.label)
-
-colorCapable = s.filter(lambda bulb : bulb.product.capabilities.has_color)
-
-#closet.setState(brightness=0.5,color='green')
-
-closet.on()
-closet.on(duration=5.0)
-closet.off()
-closet.toggle()
-closet.toggle(duration=2.0)
-closet.setPower('on')
-closet.setColor('green')
-closet.setColor(brightness=0.5,rgb=[0,100,100])
-closet.setBrightness(0.5)
-closet.setInfrared(0.2)
-closet.setState(color='blue',brightness=0.5)
-closet.stateDelta(hue=-15,saturation=0.1)
-closet.breatheEffect(color='red',from_color='blue')
-closet.pulseEffect(color='red',from_color='blue',period=0.5)
-closet.cycle(states={'states':[{'color':'red'},{'color':'blue'}],'defaults':{'power':'on'}})
-
-#scenes = s.getScenes()
-
-
-#closet.off()
 
 
 
 
 
+state = State(token,alwaysRefresh=False)
 
+bedroom = state.filter(lambda bulb : 'bedroom' in bulb.label)
+
+bedroom.toggle()
 
 
 
