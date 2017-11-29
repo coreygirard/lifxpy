@@ -316,6 +316,9 @@ class State(object):
             bulbs,resp = self.actuallyRequest(cmd,bulbs,data)
 
     def actuallyRequest(self,cmd,bulbs,data):
+        # TODO: Implement a .freeze() method to hold all outgoing requests,
+        # concatenating them into a single state change if possible, which is
+        # then sent when the opposite method is called
         method = self.requestParams[cmd]['method']
         url = self.requestParams[cmd]['url']
 
@@ -366,52 +369,6 @@ class State(object):
 
 with open('tokens.json') as f:
     token = json.load(f)['lifx']
-
-state = State(token,alwaysRefresh=False)
-bedroom = state.lights.filter(lambda bulb : 'bedroom' in bulb.label)
-closet = state.lights.filter(lambda bulb : 'closet' in bulb.label)
-#bedroom.toggle()
-
-assert('corey_bedroom' in bedroom)
-assert('corey_bedroom' not in closet)
-assert('corey_closet' not in bedroom)
-assert('corey_closet' in closet)
-
-assert('d073d512e980' in bedroom)
-assert('d073d512e980' not in closet)
-assert('d073d510ae5b' not in bedroom)
-assert('d073d510ae5b' in closet)
-
-bedroom.setColor('white')
-bedroom.off()
-
-#state.activateScene('Red')
-
-blue = state.scenes.filter(lambda scene : scene.name == 'Blue')
-red = state.scenes.filter(lambda scene : scene.name == 'Red')
-
-assert('Blue' in blue)
-assert('Red' in red)
-
-'''
-while True:
-    blue.activate()
-    time.sleep(5)
-    red.activate()
-    time.sleep(5)
-'''
-
-
-
-'''
-state = State(token,alwaysRefresh=False)
-
-print(state.listLights())
-
-assert('Red' in state.scenes)
-state.activateScene('Red')
-'''
-
 
 
 

@@ -28,3 +28,39 @@ colorCapable = s.filter(lambda bulb : bulb.product.capabilities.has_color)
 
 ```
 
+```python
+
+state = State(token,alwaysRefresh=False)
+bedroom = state.lights.filter(lambda bulb : 'bedroom' in bulb.label)
+closet = state.lights.filter(lambda bulb : 'closet' in bulb.label)
+bedroom.toggle()
+
+assert('corey_bedroom' in bedroom)
+assert('corey_bedroom' not in closet)
+assert('corey_closet' not in bedroom)
+assert('corey_closet' in closet)
+
+assert('d073d512e980' in bedroom)
+assert('d073d512e980' not in closet)
+assert('d073d510ae5b' not in bedroom)
+assert('d073d510ae5b' in closet)
+
+
+blue = state.scenes.filter(lambda scene : scene.name == 'Blue')
+
+blue.activate()
+
+
+
+
+print(state.listLights())
+
+assert('Red' in state.scenes)
+
+
+
+
+```
+
+
+
