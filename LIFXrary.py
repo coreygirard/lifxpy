@@ -302,50 +302,49 @@ class HandleRequest(object):
         elif domain == 'scenes':
             selector = ','.join(['uuid:'+i for i in ids])
 
-        print(method,url.format(delector)
+        print(method,url.format(selector))
 
         #if method == 'get':
         #    resp = requests.get(url.format(selector),data=data)
 
-        '''
-    # TODO: make concurrent
-    def coroutine(self,backoff,cmd,bulbs,data):
-        while len(backoff) > 0 and len(bulbs) > 0:
-            time.sleep(backoff.pop(0))
-            bulbs,resp = self.actuallyRequest(cmd,bulbs,data)
 
-    def actuallyRequest(self,cmd,bulbs,data):
+    # TODO: make concurrent
+    #def coroutine(self,backoff,cmd,bulbs,data):
+    #    while len(backoff) > 0 and len(bulbs) > 0:
+    #        time.sleep(backoff.pop(0))
+    #        bulbs,resp = self.actuallyRequest(cmd,bulbs,data)
+
+    #def actuallyRequest(self,cmd,bulbs,data):
         # TODO: Implement a .freeze() method to hold all outgoing requests,
         # concatenating them into a single state change if possible, which is
         # then sent when the opposite method is called
-        method = self.requestParams[cmd]['method']
-        url = self.requestParams[cmd]['url']
+    #    method = self.requestParams[cmd]['method']
+    #    url = self.requestParams[cmd]['url']
 
-        selector = ','.join(['id:'+i for i in bulbs])
-        url = url.format(selector)
+    #    selector = ','.join(['id:'+i for i in bulbs])
+    #    url = url.format(selector)
 
-        print(method,url,data)
+    #    print(method,url,data)
 
-        if method == 'get':
-            resp = requests.get(url,headers=self.headers)
-        elif method == 'put':
-            resp = requests.put(url,headers=self.headers,data=data)
-        elif method == 'post':
-            resp = requests.post(url,headers=self.headers,data=data)
+    #    if method == 'get':
+    #        resp = requests.get(url,headers=self.headers)
+    #    elif method == 'put':
+    #        resp = requests.put(url,headers=self.headers,data=data)
+    #    elif method == 'post':
+    #        resp = requests.post(url,headers=self.headers,data=data)
 
-        failed = []
-        for result in resp.json()['results']:
-            if result['status'] == 'ok':
-                self.parent.updateState(result['id'],cmd,data)
-            else:
-                failed.append(result['id'])
+    #    failed = []
+    #    for result in resp.json()['results']:
+    #        if result['status'] == 'ok':
+    #            self.parent.updateState(result['id'],cmd,data)
+    #        else:
+    #            failed.append(result['id'])
 
-        return failed,resp.json()
+    #    return failed,resp.json()
 
-    def setBackoff(self,backoff):
-        assert(type(backoff) == type([]))
-        self.backoff = backoff
-        '''
+    #def setBackoff(self,backoff):
+    #    assert(type(backoff) == type([]))
+    #    self.backoff = backoff
 
     def buildRequest(self,label,data):
         if label == 'on':
