@@ -117,7 +117,7 @@ class Handler(object):
 class State(object):
     def __init__(self,token,alwaysRefresh=True):
         self.alwaysRefresh = alwaysRefresh
-        self.handleRequest = HandleRequest(self)
+        self.handleRequest = HandleRequest(self,token)
 
         self.lights = Handler('lights',self)
         self.refreshLights()
@@ -141,7 +141,7 @@ class State(object):
             self.refreshScenes()
         return list(self.scenesData.values())
 
-    def debugState(self):
+    def debugLights(self):
         return [e.dict() for e in self.lightsData.values()]
 
     def filteredLights(self,query):
@@ -175,9 +175,10 @@ class State(object):
 
 
 class HandleRequest(object):
-    def __init__(self,parent):
+    def __init__(self,parent,token):
         self.parent = parent
-        self.headers = {'Authorization': 'Bearer ' + token}
+        self.token = token
+        self.headers = {'Authorization': 'Bearer ' + self.token}
         self.backoff = [1,1,1,1,1,2,4,8,16,32]
 
         self.params = {'lights':{'toggle':        {'url':'https://api.lifx.com/v1/lights/{0}/toggle',
@@ -286,29 +287,7 @@ class HandleRequest(object):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+'''
 
 with open('tokens.json') as f:
     token = json.load(f)['lifx']
@@ -330,6 +309,6 @@ night = state.scenes.filter(lambda scene : 'Night' in scene.name)
 print(night)
 
 night.activate()
-
+'''
 
 
