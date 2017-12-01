@@ -6,15 +6,16 @@ import asyncio
 
 
 
-class Bulb(object):
-    def __init__(self,data):
+class Thing(object):
+    def __init__(self,typ,data):
+        self.typ = typ
         for k,v in data.items():
             setattr(self,k,v)
             if type(v) == type(dict()):
-                setattr(self,k,Bulb(v))
+                setattr(self,k,Thing(self.typ,v))
 
     def __repr__(self):
-        return 'Light({0})'.format(self.label)
+        return self.typ.title() + '({0})'.format(self.label)
 
     def dict(self):
         d = {}
@@ -39,24 +40,26 @@ class Method(object):
     def __call__(self,*args,**kwargs):
         self.ptr(self.domain,self.cmd,*args,**kwargs)
 
-class LightsView(object):
-    def __init__(self,parent,query):
+class View(object):
+    def __init__(self,domain,parent,query):
+        self.domain = domain
         self.parent = parent
         self.query = query
 
-        self.cmdList = ['off',
-                        'on',
-                        'toggle',
-                        'setState',
-                        'setPower',
-                        'setColor',
-                        'setBrightness',
-                        'setInfrared',
-                        'pulseEffect',
-                        'stateDelta',
-                        'breatheEffect',
-                        'pulseEffect',
-                        'cycle']
+        self.cmdList = {'lights':['off',
+                                  'on',
+                                  'toggle',
+                                  'setState',
+                                  'setPower',
+                                  'setColor',
+                                  'setBrightness',
+                                  'setInfrared',
+                                  'pulseEffect',
+                                  'stateDelta',
+                                  'breatheEffect',
+                                  'pulseEffect',
+                                  'cycle'],
+                        'scenes':['activate']}
 
     def abstractRequest(self,*args,**kwargs):
         kwargs['query'] = self.query
@@ -70,19 +73,29 @@ class LightsView(object):
         return item in names
 
     def __getattr__(self,e):
-        if e in self.cmdList:
-            return Method('lights',e,self.abstractRequest)
+        if e in self.cmdList[self.domain]:
+            return Method(self.domain,e,self.abstractRequest)
 
     def __repr__(self):
-        contents = ','.join(['label:'+bulb.label for bulb in self.parent.filteredLights(self.query)])
-        return 'LightsView({0})'.format(contents)
+        if self.domain == 'lights':
+            contents = ','.join(['label:'+bulb.label for bulb in self.parent.filteredLights(self.query)])
+        elif self.domain == 'scenes':
+            contents = ','.join(['name:'+bulb.name for bulb in self.parent.filteredScenes(self.query)])
+        return self.domain.title() + 'View({0})'.format(contents)
 
-class LightsHandler(object):
-    def __init__(self,parent):
+class Handler(object):
+    def __init__(self,domain,parent):
+        self.domain = domain
         self.parent = parent
 
     def filter(self,query):
-        return LightsView(self,query)
+        return View(self.domain,self,query)
+
+    def filteredLights(self,query):
+        return self.parent.filteredLights(query)
+
+    def filteredScenes(self,query):
+        return self.parent.filteredScenes(query)
 
     def __contains__(self,item):
         names = []
@@ -92,16 +105,6 @@ class LightsHandler(object):
         return item in names
 
     def request(self,*args,**kwargs):
-        '''
-        query = kwargs['query']
-        del kwargs['query']
-        data = kwargs
-
-
-
-        bulbs = self.parent.filteredLights(query)
-        self.parent.request(cmd,bulbs,data)
-        '''
         self.parent.request(*args,**kwargs)
 
 
@@ -111,99 +114,41 @@ class LightsHandler(object):
 
 
 
-
-class Scene(object):
-    def __init__(self,data):
-        for k,v in data.items():
-            setattr(self,k,v)
-            if type(v) == type(dict()):
-                setattr(self,k,Bulb(v))
-
-    def __repr__(self):
-        return 'Scene({0})'.format(self.label)
-
-    def dict(self):
-        d = {}
-        for k,v in vars(self).items():
-            if type(v) == type(self):
-                d[k] = v.dict()
-            else:
-                d[k] = v
-        return d
-
-
-'''
-class SceneView(object):
-    def __init__(self,parent,query):
-        self.parent = parent
-        self.query = query
-
-    def __contains__(self,item):
-        names = []
-        for s in self.parent.parent.filteredScenes(self.query):
-            names.append(self.parent.parent.scenesData[s].uuid)
-            names.append(self.parent.parent.scenesData[s].name)
-        return item in names
-
-    def activate(self):
-        self.parent.activate(self.query)
-
-
-class SceneHandler(object):
-    def __init__(self,parent):
-        self.parent = parent
-
-    def __contains__(self,item):
-        names = [s['name'] for s in self.parent.sceneData.values()]
-        return item in names
-
-    def filter(self,query):
-        return SceneView(self,query)
-
-    def activate(self,query):
-        self.parent.activateScene(query)
-'''
-
-
 class State(object):
     def __init__(self,token,alwaysRefresh=True):
         self.alwaysRefresh = alwaysRefresh
         self.handleRequest = HandleRequest(self)
 
-        #self.hardRefresh()
-        #self.fetchScenes()
-        #self.scenes = SceneHandler(self)
-        self.lights = LightsHandler(self)
+        self.lights = Handler('lights',self)
+        self.refreshLights()
 
-    # -------- FETCHING CURRENT STATE FROM SERVER --------
+        self.scenes = Handler('scenes',self)
+        self.refreshScenes()
 
+    def refreshLights(self):
+        self.lightsData = self.handleRequest.fetchLights()
+
+    def refreshScenes(self):
+        self.scenesData = self.handleRequest.fetchScenes()
 
     def listLights(self):
         if self.alwaysRefresh:
-            self.lightsData = self.handleRequest.fetchLights()
+            self.refreshLights()
         return list(self.lightsData.values())
+
+    def listScenes(self):
+        if self.alwaysRefresh:
+            self.refreshScenes()
+        return list(self.scenesData.values())
 
     def debugState(self):
         return [e.dict() for e in self.lightsData.values()]
 
     def filteredLights(self,query):
-        return [bulb.id for bulb in self.listLights() if query(bulb)]
-
-    '''
-    def listScenes(self):
-        return list(self.scenesData.values())
+        return [bulb for bulb in self.listLights() if query(bulb)]
 
     def filteredScenes(self,query):
-        return [scene.uuid for scene in self.listScenes() if query(scene)]
-    '''
-    def setBackoff(self,backoff):
-        assert(type(backoff) == type([]))
-        self.handleRequest.setBackoff(backoff)
-
-    '''
-    def abstractRequest(self,*args,**kwargs):
-        print(args,kwargs)
-    '''
+        return [scene for scene in self.listScenes() if query(scene)]
 
     def request(self,*args,**kwargs):
         query = kwargs['query']
@@ -212,11 +157,10 @@ class State(object):
         domain,cmd = args
 
         if domain == 'lights':
-            ids = [bulb.id for bulb in self.listLights() if query(bulb)]
+            ids = [bulb.id for bulb in self.filteredLights(query)]
         elif domain == 'scenes':
-            pass
+            ids = [scene.uuid for scene in self.filteredScenes(query)]
 
-        #print(domain,ids,cmd,data)
         self.handleRequest.request(domain,ids,cmd,data)
 
     def updateState(self,bulb,cmd,data):
@@ -229,32 +173,12 @@ class State(object):
             else:
                 self.lightsData[bulb].power = 'on'
 
-    '''
-    # -------- HANDLE SCENES --------
-
-    def activateScene(self,query):
-        for i in self.filteredScenes(query):
-            print(i)
-
-            url = 'https://api.lifx.com/v1/scenes/{0}/activate'
-            url = url.format('scene_id:'+i)
-            resp = requests.put(url,headers=self.headers)
-    '''
-
 
 class HandleRequest(object):
     def __init__(self,parent):
         self.parent = parent
         self.headers = {'Authorization': 'Bearer ' + token}
         self.backoff = [1,1,1,1,1,2,4,8,16,32]
-
-        '''
-        TODO: implement a low-latency mode where the module attempts to
-        keep track of all lights' state for filtering purposes, to reduce the
-        number of calls required to get lights' current state. Likely error-prone
-        in non-ideal network conditions or with complex operations, but
-        should assist in performing tightly choreographed sequences
-        '''
 
         self.params = {'lights':{'toggle':        {'url':'https://api.lifx.com/v1/lights/{0}/toggle',
                                                    'method':'post'},
@@ -273,80 +197,34 @@ class HandleRequest(object):
     def fetchLights(self):
         print('hard refresh')
         resp = requests.get('https://api.lifx.com/v1/lights/all',headers=self.headers)
-        return {e['id']:Bulb(e) for e in resp.json()}
+        return {e['id']:Thing('Bulb',e) for e in resp.json()}
 
-    '''
     def fetchScenes(self):
         resp = requests.get('https://api.lifx.com/v1/scenes', headers=self.headers)
-        return {e['uuid']:Scene(e) for e in resp.json()}
-    '''
+        return {e['uuid']:Thing('Scene',e) for e in resp.json()}
 
     def request(self,domain,ids,cmd,data):
-        #print(domain,ids,cmd,data)
 
-        cmd,data = self.buildRequest(cmd,data)
+        if domain == 'lights':
+            cmd,data = self.buildLightRequest(cmd,data)
+            method = self.params[domain][cmd]['method']
+            url = self.params[domain][cmd]['url']
+            self.actuallyRequest(domain,method,url,ids,data)
+        elif domain == 'scenes':
+            method = 'put'
+            url = 'https://api.lifx.com/v1/scenes/{0}/activate'
+            self.actuallyRequest(domain,method,url,ids,data)
 
-        method = self.params[domain][cmd]['method']
-        url = self.params[domain][cmd]['url']
-
-        print(domain,method,url,ids,data)
-
-        #bulbs,resp = self.actuallyRequest(cmd,bulbs,data) # try once
-
-        #if len(bulbs) > 0:
-        #    self.coroutine(self.backoff[:],cmd,bulbs,data)
 
     def actuallyRequest(self,domain,method,url,ids,data):
         if domain == 'lights':
             selector = ','.join(['id:'+i for i in ids])
         elif domain == 'scenes':
-            selector = ','.join(['uuid:'+i for i in ids])
+            selector = ','.join(['scene_id:'+i for i in ids])
 
-        print(method,url.format(selector))
+        print(method,url.format(selector),data)
 
-        #if method == 'get':
-        #    resp = requests.get(url.format(selector),data=data)
-
-
-    # TODO: make concurrent
-    #def coroutine(self,backoff,cmd,bulbs,data):
-    #    while len(backoff) > 0 and len(bulbs) > 0:
-    #        time.sleep(backoff.pop(0))
-    #        bulbs,resp = self.actuallyRequest(cmd,bulbs,data)
-
-    #def actuallyRequest(self,cmd,bulbs,data):
-        # TODO: Implement a .freeze() method to hold all outgoing requests,
-        # concatenating them into a single state change if possible, which is
-        # then sent when the opposite method is called
-    #    method = self.requestParams[cmd]['method']
-    #    url = self.requestParams[cmd]['url']
-
-    #    selector = ','.join(['id:'+i for i in bulbs])
-    #    url = url.format(selector)
-
-    #    print(method,url,data)
-
-    #    if method == 'get':
-    #        resp = requests.get(url,headers=self.headers)
-    #    elif method == 'put':
-    #        resp = requests.put(url,headers=self.headers,data=data)
-    #    elif method == 'post':
-    #        resp = requests.post(url,headers=self.headers,data=data)
-
-    #    failed = []
-    #    for result in resp.json()['results']:
-    #        if result['status'] == 'ok':
-    #            self.parent.updateState(result['id'],cmd,data)
-    #        else:
-    #            failed.append(result['id'])
-
-    #    return failed,resp.json()
-
-    #def setBackoff(self,backoff):
-    #    assert(type(backoff) == type([]))
-    #    self.backoff = backoff
-
-    def buildRequest(self,label,data):
+    def buildLightRequest(self,label,data):
         if label == 'on':
             cmd = 'setState'
             data['power'] = 'on'
@@ -440,18 +318,18 @@ with open('tokens.json') as f:
 
 
 
-state = State(token)
+state = State(token,alwaysRefresh=False)
 
 bedroom = state.lights.filter(lambda bulb : 'bedroom' in bulb.label)
 bedroom.setState(color='white',power='off')
 
-#print(bedroom)
+print(bedroom)
 
-#red = state.scenes.filter(lambda scene : 'Red' in scene.name)
+night = state.scenes.filter(lambda scene : 'Night' in scene.name)
 
-#print(red)
+print(night)
 
-
+night.activate()
 
 
 
