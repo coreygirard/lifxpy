@@ -193,7 +193,8 @@ class HandleRequest(object):
                                                    'method':'post'},
                                  'cycle':         {'url':'https://api.lifx.com/v1/lights/{0}/cycle',
                                                    'method':'post'}},
-                       'scenes':{}}
+                       'scenes':{'activateScene': {'url':'https://api.lifx.com/v1/scenes/{0}/activate',
+                                                   'method':'put'}}}
 
     def fetchLights(self):
         print('hard refresh')
@@ -205,15 +206,15 @@ class HandleRequest(object):
         return {e['uuid']:Thing('Scene',e) for e in resp.json()}
 
     def request(self,domain,ids,cmd,data):
-
         if domain == 'lights':
             cmd,data = self.buildLightRequest(cmd,data)
             method = self.params[domain][cmd]['method']
             url = self.params[domain][cmd]['url']
             self.actuallyRequest(domain,method,url,ids,data)
         elif domain == 'scenes':
-            method = 'put'
-            url = 'https://api.lifx.com/v1/scenes/{0}/activate'
+            cmd,data = self.buildSceneRequest(cmd,data)
+            method = self.params[domain][cmd]['method']
+            url = self.params[domain][cmd]['url']
             self.actuallyRequest(domain,method,url,ids,data)
 
 
@@ -224,6 +225,14 @@ class HandleRequest(object):
             selector = ','.join(['scene_id:'+i for i in ids])
 
         print(method,url.format(selector),data)
+
+    def buildSceneRequest(self,label,data):
+        if label == 'activate':
+            cmd = 'activateScene'
+        elif label == 'activateScene':
+            cmd = label
+
+        return cmd,data
 
     def buildLightRequest(self,label,data):
         if label == 'on':
