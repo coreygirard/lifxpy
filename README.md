@@ -150,6 +150,20 @@ red = lifx.filter(lambda bulb : bulb.color == 'red')
 
 Potentially allow 'freezing` a dynamic view, which would just return a new dynamic view that searches for whatever ids were in the dynamic search at the time
 
+Maybe allow set operations between views. Example:
+
+```python
+
+a | b # all lights that are in a or b
+
+a & b # all lights that are in a and b
+
+a - b # all lights that are in a and not in b
+
+b - a # all lights that are in b and not in a
+
+```
+
 ---
 ---
 ---
