@@ -7,20 +7,20 @@ import asyncio
 
 
 class Thing(object):
-    def __init__(self,typ,data):
+    def __init__(self, typ, data):
         self.typ = typ
-        for k,v in data.items():
-            setattr(self,k,v)
-            if type(v) == type(dict()):
-                setattr(self,k,Thing(self.typ,v))
+        for k, v in data.items():
+            setattr(self, k, v)
+            if isinstance(v, dict):
+                setattr(self, k, Thing(self.typ, v))
 
     def __repr__(self):
         return self.typ.title() + '({0})'.format(self.label)
 
     def dict(self):
         d = {}
-        for k,v in vars(self).items():
-            if type(v) == type(self):
+        for k, v in vars(self).items():
+            if isinstance(v, Thing):
                 d[k] = v.dict()
             else:
                 d[k] = v
@@ -32,49 +32,49 @@ class Thing(object):
 
 
 class Method(object):
-    def __init__(self,domain,cmd,ptr):
+    def __init__(self, domain, cmd, ptr):
         self.domain = domain
         self.cmd = cmd
         self.ptr = ptr
 
-    def __call__(self,*args,**kwargs):
-        self.ptr(self.domain,self.cmd,*args,**kwargs)
+    def __call__(self, *args, **kwargs):
+        self.ptr(self.domain, self.cmd, *args, **kwargs)
 
 class View(object):
-    def __init__(self,domain,parent,query):
+    def __init__(self, domain, parent, query):
         self.domain = domain
         self.parent = parent
         self.query = query
 
-        self.cmdList = {'lights':['off',
-                                  'on',
-                                  'toggle',
-                                  'setState',
-                                  'setPower',
-                                  'setColor',
-                                  'setBrightness',
-                                  'setInfrared',
-                                  'pulseEffect',
-                                  'stateDelta',
-                                  'breatheEffect',
-                                  'pulseEffect',
-                                  'cycle'],
-                        'scenes':['activate']}
+        self.cmdList = {'lights': ['off',
+                                   'on',
+                                   'toggle',
+                                   'setState',
+                                   'setPower',
+                                   'setColor',
+                                   'setBrightness',
+                                   'setInfrared',
+                                   'pulseEffect',
+                                   'stateDelta',
+                                   'breatheEffect',
+                                   'pulseEffect',
+                                   'cycle'],
+                        'scenes': ['activate']}
 
-    def abstractRequest(self,*args,**kwargs):
+    def abstract_request(self, *args, **kwargs):
         kwargs['query'] = self.query
-        self.parent.request(*args,**kwargs)
+        self.parent.request(*args, **kwargs)
 
-    def __contains__(self,item):
+    def __contains__(self, item):
         names = []
         for bulb in self.parent.parent.filteredLights(self.query):
             names.append(self.parent.parent.lightsData[bulb].label)
             names.append(self.parent.parent.lightsData[bulb].id)
         return item in names
 
-    def __getattr__(self,e):
+    def __getattr__(self, e):
         if e in self.cmdList[self.domain]:
-            return Method(self.domain,e,self.abstractRequest)
+            return Method(self.domain, e, self.abstractRequest)
 
     def __repr__(self):
         if self.domain == 'lights':
@@ -84,28 +84,28 @@ class View(object):
         return self.domain.title() + 'View({0})'.format(contents)
 
 class Handler(object):
-    def __init__(self,domain,parent):
+    def __init__(self, domain, parent):
         self.domain = domain
         self.parent = parent
 
-    def filter(self,query):
-        return View(self.domain,self,query)
+    def filter(self, query):
+        return View(self.domain, self, query)
 
-    def filteredLights(self,query):
+    def filtered_lights(self, query):
         return self.parent.filteredLights(query)
 
-    def filteredScenes(self,query):
+    def filtered_scenes(self, query):
         return self.parent.filteredScenes(query)
 
-    def __contains__(self,item):
+    def __contains__(self, item):
         names = []
         for s in self.parent.listLights():
             names.append(s.label)
             names.append(s.id)
         return item in names
 
-    def request(self,*args,**kwargs):
-        self.parent.request(*args,**kwargs)
+    def request(self, *args, **kwargs):
+        self.parent.request(*args, **kwargs)
 
 
 
@@ -319,5 +319,3 @@ print(night)
 
 night.activate()
 '''
-
-

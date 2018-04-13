@@ -59,7 +59,7 @@ print("'currentlyDim': {0}".format(currentlyDim))
 
 # set brightness of label:kitchen bulb to 0.25
 
-'currentlyDim': [Bulb(label:kitchen,id:0123456789)]
+'currentlyDim': [Bulb(label:kitchen, id:0123456789)]
 ```
 
 Why do things this way? Because it greatly simplifies doing certain operations to all bulbs that meet certain criteria:
@@ -75,14 +75,14 @@ dim.off()
 
 ```python
 red = lifx.filter(lambda bulb : bulb.color == 'red')
-red.stateDelta(brightness=-0.25
+red.state_delta(brightness=-0.25
 ```
 
 - Shift color of all lit bulbs:
 
 ```python
 lit = lifx.filter(lambda bulb : bulb.power == 'on')
-lit.stateDelta(hue=+30)
+lit.state_delta(hue=+30)
 ```
 
 - Turn on all lights labelled `kitchen_*` or `dining_*`:
@@ -107,9 +107,9 @@ For a full list of available member functions and arguments, see the [reference]
 
 The library also offers two simple helper functions:
 
-- `.getBulbByLabel(label)` is equivalent to `.filter(lambda bulb : bulb.label == label)`
+- `.get_bulb_by_label(label)` is equivalent to `.filter(lambda bulb : bulb.label == label)`
 
-- `.getBulbById(i)` is equivalent to `.filter(lambda bulb : bulb.id == i)`
+- `.get_bulb_by_id(i)` is equivalent to `.filter(lambda bulb : bulb.id == i)`
 
 The earlier example could also be written:
 
@@ -118,7 +118,7 @@ The earlier example could also be written:
 import lifxpy
 lifx = lifxpy.State(token)
 
-kitchen = lifx.getBulbByLabel('kitchen')
+kitchen = lifx.get_bulb_by_label('kitchen')
 kitchen.toggle()
 ```
 
@@ -132,13 +132,13 @@ kitchen.toggle()
 Disallow non-keyword arguments for functions that take more than one argument:
 
 ```python
-    def setState(self,*args,**kwargs):
+    def set_state(self, *args, **kwargs):
         if args:
-            raise TypeError("'setState' doesn't accept non-keyword arguments")
-        
-        brightness = kwargs.get('brightness',None)
-        color = kwargs.get('color',None)
-        
+            raise TypeError("'set_state' doesn't accept non-keyword arguments")
+
+        brightness = kwargs.get('brightness', None)
+        color = kwargs.get('color', None)
+
         # do stuff
 ```
 
@@ -174,23 +174,23 @@ state = lifx.State(token)
 kitchen = state.filter(lambda bulb : bulb.label == 'kitchen')
 currentlyDim = state.filter(lambda bulb : bulb.brightness < 0.5)
 
-print("'{0}' brightness: {1}".format(kitchen[0].label,kitchen[0].brightness))
-print("'{0}' color: {1}".format(kitchen[0].label,kitchen[0].color))
+print("'{0}' brightness: {1}".format(kitchen[0].label, kitchen[0].brightness))
+print("'{0}' color: {1}".format(kitchen[0].label, kitchen[0].color))
 
-currentlyDim.setColor('blue')
+currentlyDim.set_color('blue')
 
-print("'{0}' brightness: {1}".format(kitchen[0].label,kitchen[0].brightness))
-print("'{0}' color: {1}".format(kitchen[0].label,kitchen[0].color))
+print("'{0}' brightness: {1}".format(kitchen[0].label, kitchen[0].brightness))
+print("'{0}' color: {1}".format(kitchen[0].label, kitchen[0].color))
 
-kitchen.setBrightness(0.25)
+kitchen.set_brightness(0.25)
 
-print("'{0}' brightness: {1}".format(kitchen[0].label,kitchen[0].brightness))
-print("'{0}' color: {1}".format(kitchen[0].label,kitchen[0].color))
+print("'{0}' brightness: {1}".format(kitchen[0].label, kitchen[0].brightness))
+print("'{0}' color: {1}".format(kitchen[0].label, kitchen[0].color))
 
-currentlyDim.setColor('blue')
+currentlyDim.set_color('blue')
 
-print("'{0}' brightness: {1}".format(kitchen[0].label,kitchen[0].brightness))
-print("'{0}' color: {1}".format(kitchen[0].label,kitchen[0].color))
+print("'{0}' brightness: {1}".format(kitchen[0].label, kitchen[0].brightness))
+print("'{0}' color: {1}".format(kitchen[0].label, kitchen[0].color))
 ```
 
 ```
@@ -219,7 +219,7 @@ colorCapable = s.filter(lambda bulb : bulb.product.capabilities.has_color)
 
 ```python
 
-state = State(token,alwaysRefresh=False)
+state = State(token, alwaysRefresh=False)
 bedroom = state.lights.filter(lambda bulb : 'bedroom' in bulb.label)
 closet = state.lights.filter(lambda bulb : 'closet' in bulb.label)
 bedroom.toggle()
@@ -242,7 +242,7 @@ blue.activate()
 
 
 
-print(state.listLights())
+print(state.list_lights())
 
 assert('Red' in state.scenes)
 

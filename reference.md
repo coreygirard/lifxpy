@@ -55,8 +55,8 @@ Description of color in English
 ### rgb (int)
 
 - type: `list`/`tuple` of `int`
-- acceptable range: `[0,0,0]` to `[255,255,255]`
-- example: `[0,255,0]`
+- acceptable range: `[0, 0, 0]` to `[255, 255, 255]`
+- example: `[0, 255, 0]`
 
 ### infrared
 
@@ -71,7 +71,7 @@ Description of color in English
 
 `.on([duration])`
 
-Examples: 
+Examples:
 
 - `lights.on()`
 - `lights.on(duration=5.0)`
@@ -80,7 +80,7 @@ Examples:
 
 `.off([duration])`
 
-Examples: 
+Examples:
 
 - `lights.off()`
 - `lights.off(duration=5.0)`
@@ -89,79 +89,79 @@ Examples:
 
 `.toggle([duration])`
 
-Examples: 
+Examples:
 
 - `lights.toggle()`
 - `lights.toggle(duration=5.0)`
 
-### setPower
+### set_power
 
-`.setPower(power[,duration])`
-
-Examples: 
-
-- `lights.setPower('on')`
-- `lights.setPower('off',duration=5.0)`
-
-### setColor
-
-`.setColor([color][,duration])`
-
-This is provided mostly as a helper method to simplify color setting. `.setColor('blue')` is exactly equivalent to `.setState(color='blue')`
-
-Examples: 
-
-- `lights.setColor('blue')`
-- `lights.setColor('blue',duration=3.0)`
-
-
-### setState
-
-`.setState([power][,color][,hue][,saturation][,brightness][,kelvin][,rgb][,duration])`
+`.set_power(power[, duration])`
 
 Examples:
 
-- `lights.setState(color='blue')`
-- `lights.setState(color='red',duration=2.0)`
-- `lights.setState(hue=240,saturation=0.5)`
-- `lights.setState(brightness=0.5,rgb=[255,0,0])`
+- `lights.set_power('on')`
+- `lights.set_power('off', duration=5.0)`
 
-### setBrightness
+### set_color
 
-`.setBrightness(brightness)`
+`.set_color([color][, duration])`
+
+This is provided mostly as a helper method to simplify color setting. `.set_color('blue')` is exactly equivalent to `.set_state(color='blue')`
+
+Examples:
+
+- `lights.set_color('blue')`
+- `lights.set_color('blue', duration=3.0)`
+
+
+### set_state
+
+`.set_state([power][, color][, hue][, saturation][, brightness][, kelvin][, rgb][, duration])`
+
+Examples:
+
+- `lights.set_state(color='blue')`
+- `lights.set_state(color='red', duration=2.0)`
+- `lights.set_state(hue=240, saturation=0.5)`
+- `lights.set_state(brightness=0.5, rgb=[255, 0, 0])`
+
+### set_brightness
+
+`.set_brightness(brightness)`
 
 Examples
 
-- `lights.setBrightness(1.0)`
+- `lights.set_brightness(1.0)`
 
-### setInfrared
+### set_infrared
 
-`.setInfrared(infrared)`
+`.set_infrared(infrared)`
 
-`.setInfrared(i)` is exactly equivalent to `.setState(infrared=i)`
+`.set_infrared(i)` is exactly equivalent to `.set_state(infrared=i)`
 
 Examples
 
-- `lights.setInfrared(0.2)`
+- `lights.set_infrared(0.2)`
 
 
-### stateDelta
+### state_delta
 
-`.stateDelta([power][,duration][,infrared][,hue][,saturation][,brightness][,kelvin])`
-
-
-
-`.stateDelta(hue=-15,saturation=0.1)`
-
-### breatheEffect
+`.state_delta([power][, duration][, infrared][, hue][, saturation][, brightness][, kelvin])`
 
 
-`.breatheEffect(color='red',from_color='blue')`
 
-### pulseEffect
+`.state_delta(hue=-15, saturation=0.1)`
 
-`.pulseEffect(color='red',from_color='blue',period=0.5)`
+### breathe_effect
+
+
+`.breathe_effect(color='red', from_color='blue')`
+
+### pulse_effect
+
+`.pulse_effect(color='red', from_color='blue', period=0.5)`
 
 ### cycle
 
-`.cycle(states={'states':[{'color':'red'},{'color':'blue'}],'defaults':{'power':'on'}})`
+`.cycle(states={'states':[{'color':'red'}, {'color':'blue'}], 'defaults':{'power':'on'}})`
