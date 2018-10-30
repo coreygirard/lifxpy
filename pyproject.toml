@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "lifxpy"
+version = "0.1.0"
+description = "Control LIFX bulbs via simple filters and idiomatic commands"
+authors = ["Corey Girard <corey.r.girard@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "*"
+requests = "^2.19"
+
+[tool.poetry.dev-dependencies]
+pytest = "^3.7"
+hypothesis = "^3.70"

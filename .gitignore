@@ -104,3 +104,4 @@ ENV/
 *.json~
 
 .DS_Store
+.pytest_cache*

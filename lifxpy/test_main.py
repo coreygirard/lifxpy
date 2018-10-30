@@ -1,9 +1,18 @@
-import unittest
-import json
-import LIFXrary
+from main import State, light
 
 
-class TestLights(unittest.TestCase):
+def test_light():
+    assert (light.id == '123') == ('id', '123')
+    assert (light.whatever == 4) == ('whatever', 4)
+
+
+state = State()
+id = state.filter(light.id == "d3b2f2d97452")
+
+for light in id:
+    print(light)
+
+'''
     def test_(self):
 
         def dummyFetchLights():
@@ -63,3 +72,4 @@ class TestLights(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+'''
